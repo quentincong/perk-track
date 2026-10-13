@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142c28"><meta name="description" content="独立运行的信用卡权益、银行开户奖励与积分账本。">
+  <title>Perk Track · Rewards, accounted for.</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#overview"><span class="brand-mark">p<span>↗</span></span><span>perk track<small>YOUR REWARDS WORKSPACE</small></span></a>
+  <div class="nav-label">WORKSPACE</div>
+  <nav id="nav" aria-label="主导航"></nav>
+  <div class="sidebar-bottom"><span class="dot"></span> 独立运行 · 数据由你掌握<br><small>Cards. Cash. Points. One picture.</small></div>
+</aside>
+<div class="shell">
+  <header><div class="breadcrumb">个人财务 <span>/</span> <span id="crumb">总览</span></div><div class="header-right"><span id="save-state">本地已保存</span><button class="button small" id="github-save">↑ 保存到 GitHub</button></div></header>
+  <div id="notice" role="status"></div>
+  <main id="main"></main>
+  <footer>PERK TRACK <span>以实际价值记账 · USD 为统一计价单位</span></footer>
+</div>
+<dialog id="editor"><form id="editor-form"><div class="modal-head"><div><span class="eyebrow">YOUR LEDGER</span><h2 id="editor-title"></h2></div><button type="button" class="icon-button" id="close-editor" aria-label="关闭">×</button></div><div id="editor-fields" class="form-grid"></div><div class="modal-actions"><button type="button" class="button danger" id="delete-record">删除记录</button><div><button type="button" class="button" id="cancel-editor">取消</button><button class="button primary" type="submit">保存记录</button></div></div></form></dialog>
+<input type="file" id="import-file" accept="application/json,.json" hidden>
+<script src="core.js"></script><script src="reports.js"></script><script src="github.js"></script><script src="app.js"></script>
+</body></html>
