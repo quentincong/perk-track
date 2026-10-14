@@ -1,0 +1,16 @@
+# Real ledgers, credentials and exports belong outside this application repository.
+data.json
+*.private.json
+perk-track-*.json
+perk-track-ledger-*.csv
+Perk-Track.html
+private/
+backups/
+exports/
+.env
+.env.*
+*.token
+node_modules/
+coverage/
+*.log
+# Only clearly fictional fixtures may be tracked under tests/.

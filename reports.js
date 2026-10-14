@@ -19,9 +19,9 @@
     }
     for(const u of data.usages.filter(u=>within(u,year,today))){const p=data.perks.find(p=>p.id===u.perkId);if(!p)continue;const r=row(p.cardId);const v=u.actualValue||0;r.perks+=v;r.perkGross+=v;if(u.valueStatus==='estimated')r.estimated+=v;}
     for(const cost of data.costs.filter(c=>within(c,year,today))){if(cost.bankId)continue;const bucket=cost.bucket||'perk',r=row(cost.cardId),v=cost.amount||0;if(bucket==='sub'){r.sub-=v;r.subCosts+=v;}else if(bucket==='spend'){r.spend-=v;r.spendCosts+=v;}else if(bucket==='perk'){r.perks-=v;r.perkCosts+=v;}else r.other-=v;if(cost.amountConfirmed===false)r.estimated+=v;}
-    const hasSub=(cardId,type)=>data.points.some(p=>p.cardId===cardId&&p.incomeBucket==='sub'&&p.type===type);
-    for(const c of data.cards){if(c.subStatus!=='received')continue;const r=row(c.id);if(!hasSub(c.id,'cashback')&&(c.subCash!=null||c.subCashEstimate!=null)){
-      const y=c.subReceiptYear||Number((c.openDate||c.openMonth||'').slice(0,4));if((year==='all'||Number(year)===y)&&y<=Number(today.slice(0,4))){const amount=c.subCash??c.subCashEstimate;r.sub+=amount;r.subGross+=amount;if(c.subCash==null)r.estimated+=amount;}
+    const hasSub=cardId=>data.points.some(p=>p.cardId===cardId&&p.incomeBucket==='sub'&&['earn','cashback'].includes(p.type));
+    for(const c of data.cards){if(c.subStatus!=='received')continue;const r=row(c.id);if(!hasSub(c.id)&&(c.subCash!=null||c.subCashEstimate!=null)){
+      const y=c.subReceiptYear;if((year==='all'&&!y||(year==='all'||Number(year)===y)&&y<=Number(today.slice(0,4)))){const amount=c.subCash??c.subCashEstimate;r.sub+=amount;r.subGross+=amount;if(c.subCash==null)r.estimated+=amount;}
     }}
     if(Object.values(unassigned).some((v)=>typeof v==='number'&&v!==0))cards.push(unassigned);
     for(const r of cards)r.total=r.spend+r.perks+r.sub+r.other;

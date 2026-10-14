@@ -29,24 +29,26 @@
     const required={cards:['name','issuer'],creditEvents:['cardId','date'],perks:['name','cardId'],usages:['perkId','date'],banks:['name','openDate'],bankEvents:['bankId','date'],points:['date','program'],costs:['date','name']};
     for(const [k,fields]of Object.entries(required))for(const r of data[k])for(const f of fields)if(!r[f]){if(f==='date'&&['bankEvents','costs','points'].includes(k)&&(!r.type||['bonus','interest','fee','earn','cashback'].includes(r.type))&&Number.isInteger(r.periodYear)&&r.periodYear>=1900&&r.periodYear<=2100)continue;if(f==='date'&&k==='usages'&&/^\d{4}-\d{2}-\d{2}$/.test(r.periodStart||'')&&/^\d{4}-\d{2}-\d{2}$/.test(r.periodEnd||''))continue;throw new Error(`缺少必填字段：${k}.${f}`);}
     for(const c of data.cards)if(!c.openDate&&!c.openUnknown&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(c.openMonth||''))throw new Error('信用卡需填写开户日期、月份，或标记开户日期未知。');
-    for(const c of data.cards)if(c.subMilestones&&(!Array.isArray(c.subMilestones)||c.subMilestones.some(m=>!Number.isFinite(m.points)||m.points<0||m.spendGoal!=null&&(!Number.isFinite(m.spendGoal)||m.spendGoal<0)||!/^\d{4}-\d{2}-\d{2}$/.test(m.deadline)||Number.isNaN(date(m.deadline).getTime())||iso(date(m.deadline))!==m.deadline||!['pending','received'].includes(m.status))))throw new Error('SUB 档位无效。');
+    for(const c of data.cards)if(c.subReceiptYear!=null&&(!Number.isInteger(c.subReceiptYear)||c.subReceiptYear<1900||c.subReceiptYear>2100))throw new Error('SUB 到账年份无效。');
+    for(const c of data.cards)if(c.subMilestones&&(!Array.isArray(c.subMilestones)||c.subMilestones.some(m=>!Number.isFinite(m.points)||m.points<0||m.spendGoal!=null&&(!Number.isFinite(m.spendGoal)||m.spendGoal<0)||m.deadline&&(!/^\d{4}-\d{2}-\d{2}$/.test(m.deadline)||Number.isNaN(date(m.deadline).getTime())||iso(date(m.deadline))!==m.deadline)||!['pending','received'].includes(m.status))))throw new Error('SUB 档位无效。');
     for(const k of ['cards','banks'])for(const r of data[k])if(r.closeMonth&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(r.closeMonth))throw new Error('关户月份无效。');
     for(const k of ['points','bankEvents','costs'])for(const r of data[k])if(typeof r.amount!=='number')throw new Error(`缺少金额或点数：${k}`);
     for(const r of data.creditEvents)if(r.type==='limit'&&typeof r.limit!=='number')throw new Error('额度事件缺少有效 CL。');
     for(const p of data.points)for(const name of [p.program,p.targetProgram])if(name&&['__proto__','constructor','prototype'].includes(name))throw new Error('积分计划名称无效。');
     if(Object.keys(data.settings.valuations||{}).some(p=>['__proto__','constructor','prototype'].includes(p)))throw new Error('估值计划名称无效。');
     for(const p of data.points)if(p.type==='transfer'&&(!p.targetProgram||p.targetProgram===p.program||!p.amount||!p.received))throw new Error('转点记录需有效的不同计划与实际点数。');
+    for(const p of data.points)if(p.affectsBalance!=null&&typeof p.affectsBalance!=='boolean')throw new Error('赚点余额标记必须为布尔值。');
     for(const p of data.perks)if(p.cycle==='custom'&&(!p.startDate||!p.endDate||p.endDate<p.startDate))throw new Error('指定权益周期无效。');
     for(const c of data.costs)if(c.cardId&&c.bankId)throw new Error('费用只能有一种归属。');
     if(data.rewardRules!=null){if(!Array.isArray(data.rewardRules))throw new Error('消费返利规则无效。');for(const r of data.rewardRules){if(!r.id||ids.has(r.id)||!data.cards.some(c=>c.id===r.cardId)||!r.category||!['cash','points'].includes(r.unit)||!Number.isFinite(r.rate)||r.rate<0||r.unit==='points'&&!r.program)throw new Error('消费返利规则字段无效。');ids.add(r.id);for(const k of ['validFrom','validTo'])if(r[k]&&(!/^\d{4}-\d{2}-\d{2}$/.test(r[k])||Number.isNaN(date(r[k]).getTime())||iso(date(r[k]))!==r[k]))throw new Error('消费规则日期无效。');}}
     for(const c of data.costs)for(const k of ['paymentBase','feePercent'])if(c[k]!=null&&(!Number.isFinite(c[k])||c[k]<0))throw new Error('手续费本金与比例必须非负。');
     for(const k of ['cards','banks'])for(const r of data[k])if(r.closeDate&&r.closeDate<r.openDate)throw new Error('关闭日期早于开户日期。');
-    for(const b of data.banks){let balance=0;for(const e of data.bankEvents.filter(e=>e.bankId===b.id).sort((a,b)=>a.date.localeCompare(b.date))){if(e.date&&(e.date<b.openDate||b.closeDate&&e.date>b.closeDate))throw new Error('银行流水日期不在开户与关户区间。');if(['dd','deposit'].includes(e.type))balance+=e.amount||0;if(e.type==='withdrawal'){balance-=e.amount||0;if(balance<-.005)throw new Error('本金取出超过已录入本金，请补录存入流水。');}}}
+    for(const b of data.banks){let balance=0;for(const e of data.bankEvents.filter(e=>e.bankId===b.id).sort((a,b)=>(a.date||'').localeCompare(b.date||''))){if(e.date&&(e.date<b.openDate||b.closeDate&&e.date>b.closeDate))throw new Error('银行流水日期不在开户与关户区间。');if(['dd','deposit'].includes(e.type))balance+=e.amount||0;if(e.type==='withdrawal'){balance-=e.amount||0;if(balance<-.005)throw new Error('本金取出超过已录入本金，请补录存入流水。');}}}
     if(!Number.isFinite(data.settings.opportunityRate)||data.settings.opportunityRate<0||!data.settings.valuations||typeof data.settings.valuations!=='object'||Array.isArray(data.settings.valuations)||Object.values(data.settings.valuations).some(v=>!Number.isFinite(v)||v<0))throw new Error('估值或机会成本利率无效。');
     return structuredClone(data);
   }
   function period(perk, cards, today=localDate()) {
-    if(perk.cycleConfirmed===false)return {start:'',end:perk.endDate?iso(new Date(date(perk.endDate).getTime()+dayMs)):'',lastDay:perk.endDate||''};
+    if(perk.cycleConfirmed===false||perk.cycle==='anniversary'&&!perk.anchorDate&&!cards.find(c=>c.id===perk.cardId)?.openDate)return {start:'',end:perk.endDate?iso(new Date(date(perk.endDate).getTime()+dayMs)):'',lastDay:perk.endDate||''};
     const d=date(today), y=d.getUTCFullYear(), m=d.getUTCMonth(); let start,end;
     if(perk.cycle==='monthly'){start=anniversary(y,m,1);end=addMonths(start,1);}
     else if(perk.cycle==='quarterly'){start=anniversary(y,Math.floor(m/3)*3,1);end=addMonths(start,3);}
@@ -73,13 +75,17 @@
   }
   function balances(data,today=localDate()) {
     const result=Object.create(null);const add=(p,n)=>{result[p]=(result[p]||0)+n;};
-    const events=data.points.filter(r=>r.date?r.date<=today:r.periodYear<=Number(today.slice(0,4)));
-    for(const r of events.slice().sort((a,b)=>a.date.localeCompare(b.date))){
+    const events=data.points.filter(r=>(r.date?r.date<=today:r.periodYear<=Number(today.slice(0,4)))&&!(r.type==='earn'&&r.affectsBalance===false));
+    for(const r of events.slice().sort((a,b)=>String(a.date||a.periodYear).localeCompare(String(b.date||b.periodYear)))){
       if(r.type==='balance')result[r.program]=r.amount;
       if(['earn','buy','refund','adjust-in'].includes(r.type))add(r.program,r.amount||0);
       if(['redeem','expire','adjust-out'].includes(r.type)||r.type==='transfer'&&r.trackSourceBalance!==false)add(r.program,-(r.amount||0));
       if(r.type==='transfer')add(r.targetProgram,r.received||0);
-    }for(const p of data.settings.incompletePointPrograms||[])if(!events.some(e=>e.program===p&&e.type==='balance'))delete result[p];return result;
+    }for(const p of data.settings.incompletePointPrograms||[])if(!events.some(e=>e.program===p&&e.type==='balance'))delete result[p];
+    // A year-only earn cannot be ordered against a snapshot in that same year.
+    for(const r of events.filter(e=>e.type==='earn'&&!e.date))if(events.some(e=>e.type==='balance'&&e.program===r.program&&Number(e.date.slice(0,4))===r.periodYear)&&!events.some(e=>e.type==='balance'&&e.program===r.program&&Number(e.date.slice(0,4))>r.periodYear))delete result[r.program];
+    // UR earnings are valued in reports; the current UR balance is not tracked.
+    delete result.UR;return result;
   }
   function occupied(data,bank,start,end) {
     if(bank.capitalComplete===false)return {balance:null,dollarDays:0};
@@ -107,12 +113,12 @@
     const pointBalances=balances(data,today);const valuation=Object.entries(pointBalances).reduce((n,[p,q])=>n+q*(data.settings.valuations[p]||0)/100,0);
     return {bankBonus,interest,bankFees,redemptions,unpricedRedemptions,cashback,perks,costs,purchases,opportunity,capital,bankNet,bankAnnualized:capital>0?bankNet/capital*365*100:null,net,valuation,balances:pointBalances};
   }
-  function bankProgress(data,bank,today=localDate()) {const events=data.bankEvents.filter(e=>e.bankId===bank.id&&e.date<=today);const dd=events.filter(e=>e.type==='dd');return {ddAmount:Math.max(dd.reduce((n,e)=>n+e.amount,0),bank.confirmedDDTotal||0),ddCount:Math.max(dd.length,bank.confirmedDDCount||0),bonus:events.filter(e=>e.type==='bonus').reduce((n,e)=>n+e.amount,0),balance:occupied(data,bank,'1900-01-01',iso(new Date(date(today).getTime()+dayMs))).balance};}
-  function redemptionValue(r) {if(typeof r.cashReference!=='number'||r.taxes===null)return null;if(r.taxesCurrency&&r.taxesCurrency!=='USD'&&r.taxesOriginal!=null&&typeof r.taxes!=='number')return null;return r.cashReference-(r.taxes||0);}
+  function bankProgress(data,bank,today=localDate()) {const events=data.bankEvents.filter(e=>e.bankId===bank.id&&(e.date?e.date<=today:e.periodYear<=Number(today.slice(0,4))));const dd=events.filter(e=>e.type==='dd');return {ddAmount:Math.max(dd.reduce((n,e)=>n+e.amount,0),bank.confirmedDDTotal||0),ddCount:Math.max(dd.length,bank.confirmedDDCount||0),bonus:events.filter(e=>e.type==='bonus').reduce((n,e)=>n+e.amount,0),balance:occupied(data,bank,'1900-01-01',iso(new Date(date(today).getTime()+dayMs))).balance};}
+  function redemptionValue(r) {if(typeof r.cashReference!=='number'||typeof r.taxes!=='number')return null;return r.cashReference-r.taxes;}
   function cpp(r) {const v=redemptionValue(r);return r.type==='redeem'&&r.amount>0&&v!==null?v/r.amount*100:null;}
   function demo(today=localDate()) {
     const data=blank();data.settings.demo=true;const y=today.slice(0,4);const shift=n=>iso(new Date(date(today).getTime()+n*dayMs));
-    data.cards=[{id:'demo-card-a',name:'Travel Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-3),initialLimit:5000,annualFee:95,feeDate:shift(28),subGoal:4000,subSpent:3250,subPoints:75000,subProgram:'UR',subDeadline:shift(14),notes:'虚构演示数据，不代表任何真实信用卡条款。'},{id:'demo-card-b',name:'Everyday Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-8),initialLimit:3700,annualFee:0,notes:'示例卡片。'}];
+    data.cards=[{id:'demo-card-a',name:'Travel Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-3),initialLimit:5000,annualFee:95,feeDate:shift(28),subGoal:4000,subStatus:'pending',subPoints:75000,subProgram:'UR',subDeadline:shift(14),notes:'虚构演示数据，不代表任何真实信用卡条款。'},{id:'demo-card-b',name:'Everyday Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-8),initialLimit:3700,annualFee:0,notes:'示例卡片。'}];
     data.creditEvents=[{id:'demo-credit',cardId:'demo-card-b',type:'limit',date:shift(-20),limit:4500,notes:'信用额度调整示例'}];
     data.perks=[{id:'demo-perk-a',cardId:'demo-card-a',name:'旅行报销 · 示例',cycle:'annual',allowance:100,notes:'请按真实条款修改。'},{id:'demo-perk-b',cardId:'demo-card-a',name:'餐饮报销 · 示例',cycle:'monthly',allowance:10,notes:'虚构月度权益'}];
     data.usages=[{id:'demo-usage',perkId:'demo-perk-a',date:shift(-15),faceUsed:60,actualValue:50,posted:true,notes:'使用了 $60，个人认可价值 $50'}];

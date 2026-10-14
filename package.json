@@ -1,0 +1,12 @@
+{
+  "name": "perk-track",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Standalone HTML/CSS/JavaScript rewards ledger; no runtime dependencies",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check.js",
+    "preview": "node scripts/preview.js"
+  }
+}
