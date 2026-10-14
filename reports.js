@@ -4,11 +4,20 @@
   const categories={aircanada:'Air Canada',travel:'其他旅行',chase_travel:'Chase Travel',dining:'餐饮',grocery:'实体超市',online_grocery:'线上超市',grocery_dining:'超市 / 餐饮（未拆分）',online_shopping:'网购',drugstore:'药店',gas:'加油 / EV',streaming:'流媒体',vacation_rental:'度假住宿',wholesale:'仓储店',tuition:'学费',other:'其他消费',unclassified:'待分类'};
   function within(r,year,today){if(r.date)return r.date<=today&&(year==='all'||r.date.slice(0,4)===String(year));if(r.periodStart&&r.periodStart>today)return false;const y=r.periodYear||Number((r.periodStart||'').slice(0,4));return Number.isInteger(y)&&y<=Number(today.slice(0,4))&&(year==='all'||y===Number(year));}
   function value(data,program,points){const cpp=data.settings.valuations[program];return {amount:(points||0)*(cpp||0)/100,missing:cpp==null};}
+  function sortedCards(data){
+    return data.cards.slice().sort((a,b)=>{
+      const feeA=typeof a.annualFee==='number'?a.annualFee:-Infinity,feeB=typeof b.annualFee==='number'?b.annualFee:-Infinity;
+      if(feeA!==feeB)return feeA>feeB?-1:1;
+      const dateA=a.openDate||a.openMonth||'',dateB=b.openDate||b.openMonth||'';
+      const monthOrder=dateB.slice(0,7).localeCompare(dateA.slice(0,7));
+      return monthOrder||(a.openDate&&b.openDate?b.openDate.localeCompare(a.openDate):Number(!!b.openDate)-Number(!!a.openDate));
+    });
+  }
   function sourceEntry(data,collection,record,bucket,amount,extra={}){
     return {collection,recordId:record.id,record,bucket,amount,program:record.program||'',cpp:record.program?data.settings.valuations[record.program]??null:null,estimated:record.amountEstimated===true||record.amountConfirmed===false||record.valueStatus==='estimated',...extra};
   }
   function report(data,year='all',today=C.localDate()){
-    const base=C.summary(data,year,today),cards=data.cards.map(c=>({id:c.id,name:C.cardState(data,c,today).name,spend:0,perks:0,sub:0,other:0,spendGross:0,perkGross:0,subGross:0,spendCosts:0,perkCosts:0,subCosts:0,total:0,estimated:0,pendingSubPoints:(c.subMilestones||[]).filter(m=>m.status!=='received').reduce((n,m)=>n+(m.points||0),0)}));
+    const base=C.summary(data,year,today),cards=sortedCards(data).map(c=>({id:c.id,name:C.cardState(data,c,today).name,spend:0,perks:0,sub:0,other:0,spendGross:0,perkGross:0,subGross:0,spendCosts:0,perkCosts:0,subCosts:0,total:0,estimated:0,pendingSubPoints:(c.subMilestones||[]).filter(m=>m.status!=='received').reduce((n,m)=>n+(m.points||0),0)}));
     const unassigned={id:'unassigned',name:'未归属卡片',spend:0,perks:0,sub:0,other:0,spendGross:0,perkGross:0,subGross:0,spendCosts:0,perkCosts:0,subCosts:0,total:0,estimated:0,pendingSubPoints:0};
     for(const r of [...cards,unassigned]){r.extraPoints=0;r.sources=[];}
     const nonCardSources=[];
@@ -47,7 +56,7 @@
     return {cards,totals,byCategory,bankRows,bankTypes,nonCardSources,missingValuations:[...missing],redemptionValue:base.redemptions,remainingValuation:base.valuation};
   }
   function cardBenefits(data,year='all',today=C.localDate()){
-    return data.cards.map(card=>{
+    return sortedCards(data).map(card=>{
       let recognized=0,pendingValue=0,referenceValue=0,overlapValue=0;
       const perks=data.perks.filter(p=>p.cardId===card.id).map(perk=>{
         const usages=data.usages.filter(u=>u.perkId===perk.id&&within(u,year,today));
@@ -59,7 +68,7 @@
           else if(['estimated','reference-only','unvalued'].includes(u.valueStatus)){eligible=0;pendingValue+=v;reason='估计 / 参考价值未确认';}
           else if(perk.benefitType!=='service'&&u.posted===false){eligible=0;pendingValue+=v;reason='报销尚未确认到账';}
           else if(perk.benefitType==='service'&&u.usageConfirmed===false){eligible=0;pendingValue+=v;reason='尚未确认使用';}
-          else if(overlap){overlapValue+=v;eligible=typeof u.cardAttributionValue==='number'?Math.min(v,Math.max(0,u.cardAttributionValue)):0;reason=eligible?'用户认可的本卡归属价值':'与 Status 重叠，尚未单独认可本卡增量';}
+          else if(overlap){overlapValue+=v;eligible=typeof u.cardAttributionValue==='number'?Math.min(v,Math.max(0,u.cardAttributionValue)):0;reason=eligible?'用户认可的本卡归属价值（重叠只计一次）':'与 Status 重叠，本卡计入价值待确认';}
           recognized+=eligible;if(typeof u.referenceValue==='number')referenceValue+=u.referenceValue;
           return sourceEntry(data,'usages',u,'perk',eligible,{kind:'benefit',label:perk.name,knownValue:known,reason});
         });
@@ -103,5 +112,5 @@
     return {bonusValue,normalValue,fee,induced,foregone,subNet:bonusValue-fee-induced-foregone,net:bonusValue+normalValue-fee-induced-foregone};
   }
   function migrate(data){data=structuredClone(data);data.rewardRules??=[];data.settings.valuations={UR:1.8,Aeroplan:1.8,...data.settings.valuations};return data;}
-  const api={categories,within,value,report,cardBenefits,pointPrograms,bestCards,subScenario,migrate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PerkReports=api;
+  const api={categories,within,value,sortedCards,report,cardBenefits,pointPrograms,bestCards,subScenario,migrate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PerkReports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

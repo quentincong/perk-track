@@ -6,6 +6,50 @@ const R = require('../reports.js');
 const { ledger, point, today } = require('./fixtures.js');
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 
+test('cards sort by annual fee then newest original opening without changing the ledger', () => {
+  const d = ledger(), card = d.cards[0];
+  d.cards = [
+    { ...card, id: 'zero', annualFee: 0, openDate: '2026-09-01' },
+    { ...card, id: 'older', annualFee: 120, openDate: '2025-02-01' },
+    { ...card, id: 'month', annualFee: 120, openDate: '', openMonth: '2026-05' },
+    { ...card, id: 'newer', annualFee: 120, openDate: '2026-05-22' },
+    { ...card, id: 'highest', annualFee: 300, openDate: '2024-01-01' },
+    { ...card, id: 'unknown-date', annualFee: 120, openDate: '', openUnknown: true },
+    { ...card, id: 'unknown-fee', annualFee: null, openDate: '2026-10-01' }
+  ];
+  const original = structuredClone(d), ids = ['highest', 'newer', 'month', 'older', 'unknown-date', 'zero', 'unknown-fee'];
+  assert.deepEqual(R.sortedCards(d).map(c => c.id), ids);
+  assert.deepEqual(R.report(d, 'all', today).cards.map(c => c.id), ids);
+  assert.deepEqual(R.cardBenefits(d, 'all', today).map(c => c.id), ids);
+  assert.deepEqual(d, original);
+});
+
+test('explicitly attributed shared services count their aggregate value once in card coverage', () => {
+  const d = ledger();
+  d.perks = [{ id: 'shared-service', name: 'Fictional service', cardId: 'fictional-card', cycle: 'annual', benefitType: 'service' }];
+  d.usages = [{ id: 'shared-uses', perkId: 'shared-service', date: '2026-06-01', quantity: 2, actualValue: 70, referenceValue: 25, valueStatus: 'confirmed', usageConfirmed: true, overlapConfirmed: true, cardAttributionValue: 70 }];
+  d.costs = [{ id: 'fee', name: 'Fictional annual fee', kind: 'annual-fee', cardId: 'fictional-card', date: '2026-06-01', amount: 100 }];
+  const c = R.cardBenefits(d, 'all', today)[0];
+  assert.equal(c.recognized, 70); assert.equal(c.perks[0].uses, 2); assert.equal(c.net, -30);
+  assert.equal(c.sources.find(s => s.recordId === 'shared-uses').amount, 70);
+});
+
+test('snapshot-linked year-only rewards preserve a tracked currency balance and leave UR untracked', () => {
+  const d = ledger();
+  d.points = [
+    point('old-snapshot', 'balance', { amount: 15000 }),
+    point('backfill', 'earn', { date: '', periodYear: 2026, amount: 500, includedInSnapshot: 'old-snapshot', affectsBalance: false, incomeBucket: 'spend' }),
+    point('bonus', 'earn', { date: '', periodYear: 2026, amount: 700, includedInSnapshot: 'old-snapshot', affectsBalance: false, incomeBucket: 'perk' }),
+    point('redemption', 'redeem', { date: '2026-07-01', amount: 4000 }),
+    point('current-snapshot', 'balance', { date: '2026-07-02', amount: 11000 })
+  ];
+  const programs = R.pointPrograms(d, 'all', today), p = programs.find(p => p.program === 'Aeroplan');
+  assert.equal(p.balanceStatus, 'tracked'); assert.equal(p.balance, 11000); assert.equal(p.assetValue, 198);
+  assert.equal(p.balanceSource.id, 'current-snapshot');
+  assert.equal(programs.find(p => p.program === 'UR').balanceStatus, 'untracked');
+  close(R.report(d, 'all', today).totals.extraPoints, 12.6);
+});
+
 test('point promotions are separate from reimbursements and cannot cover an annual fee', () => {
   const d = ledger(); d.cards[0].annualFee = 80;
   d.points = [

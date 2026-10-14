@@ -163,3 +163,22 @@ test('currency cards expose balances, raw taxes and measured CPP; sliders refres
   assert.match(app.element('[data-program-cards]').innerHTML, /2\.000¢/);
   assert.equal(app.requests.length, 0);
 });
+
+test('card, overview and benefit views use fee/newest ordering; currency labels distinguish untracked from known balance', () => {
+  const d = ledger(), original = d.cards[0];
+  d.cards = [
+    { ...original, id: 'low', name: 'Fictional low fee', annualFee: 0, openDate: '2026-08-01' },
+    { ...original, id: 'older', name: 'Fictional older premium', annualFee: 120, openDate: '2025-01-01' },
+    { ...original, id: 'newer', name: 'Fictional newer premium', annualFee: 120, openDate: '2026-05-01' }
+  ];
+  d.points = [point('snapshot', 'balance', { amount: 11000 })];
+  const app = mount(d);
+  for (const page of ['overview', 'cards', 'perks']) {
+    app.route(page); const html = app.element('#main').innerHTML;
+    assert.ok(html.indexOf('Fictional newer premium') < html.indexOf('Fictional older premium'));
+    assert.ok(html.indexOf('Fictional older premium') < html.indexOf('Fictional low fee'));
+  }
+  app.route('points'); const html = app.element('#main').innerHTML;
+  assert.match(html, /暂不追踪/); assert.match(html, /11,000 点/);
+  assert.doesNotMatch(html, /未追踪 \/ 待补/);
+});
