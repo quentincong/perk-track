@@ -23,7 +23,7 @@
     }}
     const refs={creditEvents:{cardId:'cards'},perks:{cardId:'cards'},usages:{perkId:'perks'},bankEvents:{bankId:'banks'},points:{cardId:'cards'},costs:{cardId:'cards',bankId:'banks'}};
     for(const [k,map]of Object.entries(refs))for(const r of data[k])for(const [f,target]of Object.entries(map))if(r[f]&&!data[target].some(t=>t.id===r[f]))throw new Error(`记录 ${r.id} 引用了不存在的关联。`);
-    for(const k of collections)for(const r of data[k])for(const key of ['amount','received','cashReference','taxes','purchaseCost','faceUsed','actualValue','limit','initialLimit','annualFee','subGoal','subSpent','subPoints','allowance','expectedBonus','ddTarget','ddCountTarget','balanceTarget','holdDays'])if(r[key]!=null && (typeof r[key]!=='number'||!Number.isFinite(r[key])||r[key]<0))throw new Error(`数值无效：${key}`);
+    for(const k of collections)for(const r of data[k])for(const key of ['amount','received','cashReference','taxes','taxesOriginal','purchaseCost','faceUsed','actualValue','limit','initialLimit','annualFee','subGoal','subSpent','subPoints','allowance','expectedBonus','ddTarget','ddCountTarget','balanceTarget','holdDays'])if(r[key]!=null && (typeof r[key]!=='number'||!Number.isFinite(r[key])||r[key]<0))throw new Error(`数值无效：${key}`);
     const allowed={bankEvents:{type:['deposit','dd','withdrawal','bonus','interest','fee']},points:{type:['earn','buy','transfer','redeem','refund','expire','cashback','adjust-in','adjust-out','balance']},creditEvents:{type:['limit','product','close','reopen']},perks:{cycle:['monthly','quarterly','semiannual','annual','anniversary','custom']},cards:{kind:['personal','business','authorized']}};
     for(const [k,map]of Object.entries(allowed))for(const r of data[k])for(const [f,list]of Object.entries(map))if(!list.includes(r[f]))throw new Error(`记录类型无效：${k}.${f}`);
     const required={cards:['name','issuer'],creditEvents:['cardId','date'],perks:['name','cardId'],usages:['perkId','date'],banks:['name','openDate'],bankEvents:['bankId','date'],points:['date','program'],costs:['date','name']};
@@ -95,9 +95,9 @@
   function summary(data,year='all',today=localDate()) {
     const start=year==='all'?'1900-01-01':`${year}-01-01`;const futureEnd=year==='all'?'9999-01-01':`${Number(year)+1}-01-01`;
     const tomorrow=iso(new Date(date(today).getTime()+dayMs));const end=futureEnd<tomorrow?futureEnd:tomorrow;
-    const within=r=>r.date?r.date>=start&&r.date<end:Number.isInteger(r.periodYear)&&(year==='all'||Number(year)===r.periodYear)&&r.periodYear<=Number(today.slice(0,4));let bankBonus=0,interest=0,bankFees=0,redemptions=0,cashback=0,purchases=0;
+    const within=r=>r.date?r.date>=start&&r.date<end:Number.isInteger(r.periodYear)&&(year==='all'||Number(year)===r.periodYear)&&r.periodYear<=Number(today.slice(0,4));let bankBonus=0,interest=0,bankFees=0,redemptions=0,unpricedRedemptions=0,cashback=0,purchases=0;
     for(const e of data.bankEvents.filter(within)){if(e.type==='bonus')bankBonus+=e.amount;if(e.type==='interest')interest+=e.amount;if(e.type==='fee')bankFees+=e.amount;}
-    for(const p of data.points.filter(within)){if(p.type==='redeem')redemptions+=(p.cashReference||0)-(p.taxes||0);if(p.type==='refund')redemptions-=(p.cashReference||0)-(p.taxes||0);if(p.type==='cashback')cashback+=p.amount||0;if(p.type==='buy')purchases+=p.purchaseCost||0;}
+    for(const p of data.points.filter(within)){if(['redeem','refund'].includes(p.type)){const v=redemptionValue(p);if(v===null)unpricedRedemptions++;else redemptions+=(p.type==='refund'?-1:1)*v;}if(p.type==='cashback')cashback+=p.amount||0;if(p.type==='buy')purchases+=p.purchaseCost||0;}
     const perks=data.usages.filter(within).reduce((n,u)=>n+(u.actualValue||0),0);
     const costs=data.costs.filter(within).reduce((n,c)=>n+(c.amount||0),0);
     const capital=data.banks.reduce((n,b)=>n+occupied(data,b,start,end).dollarDays,0);
@@ -105,10 +105,11 @@
     const bankNet=bankBonus+interest-bankFees-opportunity-data.costs.filter(c=>within(c)&&c.bankId).reduce((n,c)=>n+c.amount,0);
     const net=bankBonus+interest+redemptions+cashback+perks-bankFees-costs-purchases-opportunity;
     const pointBalances=balances(data,today);const valuation=Object.entries(pointBalances).reduce((n,[p,q])=>n+q*(data.settings.valuations[p]||0)/100,0);
-    return {bankBonus,interest,bankFees,redemptions,cashback,perks,costs,purchases,opportunity,capital,bankNet,bankAnnualized:capital>0?bankNet/capital*365*100:null,net,valuation,balances:pointBalances};
+    return {bankBonus,interest,bankFees,redemptions,unpricedRedemptions,cashback,perks,costs,purchases,opportunity,capital,bankNet,bankAnnualized:capital>0?bankNet/capital*365*100:null,net,valuation,balances:pointBalances};
   }
   function bankProgress(data,bank,today=localDate()) {const events=data.bankEvents.filter(e=>e.bankId===bank.id&&e.date<=today);const dd=events.filter(e=>e.type==='dd');return {ddAmount:Math.max(dd.reduce((n,e)=>n+e.amount,0),bank.confirmedDDTotal||0),ddCount:Math.max(dd.length,bank.confirmedDDCount||0),bonus:events.filter(e=>e.type==='bonus').reduce((n,e)=>n+e.amount,0),balance:occupied(data,bank,'1900-01-01',iso(new Date(date(today).getTime()+dayMs))).balance};}
-  function cpp(r) {return r.type==='redeem'&&r.amount>0?((r.cashReference||0)-(r.taxes||0))/r.amount*100:null;}
+  function redemptionValue(r) {if(typeof r.cashReference!=='number'||r.taxes===null)return null;if(r.taxesCurrency&&r.taxesCurrency!=='USD'&&r.taxesOriginal!=null&&typeof r.taxes!=='number')return null;return r.cashReference-(r.taxes||0);}
+  function cpp(r) {const v=redemptionValue(r);return r.type==='redeem'&&r.amount>0&&v!==null?v/r.amount*100:null;}
   function demo(today=localDate()) {
     const data=blank();data.settings.demo=true;const y=today.slice(0,4);const shift=n=>iso(new Date(date(today).getTime()+n*dayMs));
     data.cards=[{id:'demo-card-a',name:'Travel Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-3),initialLimit:5000,annualFee:95,feeDate:shift(28),subGoal:4000,subSpent:3250,subPoints:75000,subProgram:'UR',subDeadline:shift(14),notes:'虚构演示数据，不代表任何真实信用卡条款。'},{id:'demo-card-b',name:'Everyday Card · 示例',issuer:'Example Bank',kind:'personal',openDate:addMonths(today,-8),initialLimit:3700,annualFee:0,notes:'示例卡片。'}];
