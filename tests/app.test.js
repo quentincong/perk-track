@@ -63,6 +63,7 @@ test('CPP input automatically saves locally and refreshes reward calculations wi
   const saved = JSON.parse(app.localStorage.getItem(ledgerKey));
   assert.equal(saved.settings.valuations.Aeroplan, 2);
   assert.match(app.element('[data-report-metrics]').innerHTML, /\$20\.00/);
+  assert.match(app.element('[data-realization-metrics]').innerHTML, /\$20\.00/);
   assert.equal(app.requests.length, 0);
 });
 
@@ -126,4 +127,39 @@ test('a manual save sends the loaded SHA; conflict leaves local changes availabl
   assert.equal(JSON.parse(app.localStorage.getItem(ledgerKey)).settings.valuations.Aeroplan, 2);
   assert.match(app.element('#notice').textContent, /停止覆盖/);
   assert.equal(app.element('#github-save').disabled, false);
+});
+
+test('overview separates point promotions from benefits and exposes the original source and formula', () => {
+  const d = ledger(); d.points = [point('fictional-promo', 'earn', { amount: 15000, incomeBucket: 'perk', source: 'transfer-bonus', cardId: 'fictional-card', notes: 'Fictional attribution evidence <script>unsafe</script>' })];
+  d.costs = [{ id: 'fictional-fee', name: 'Annual fee', kind: 'annual-fee', bucket: 'perk', cardId: 'fictional-card', date: '2026-06-01', amount: 80 }];
+  const app = mount(d), html = app.element('#main').innerHTML;
+  assert.match(html, /权益 \/ 报销净额/); assert.match(html, /额外积分奖励/);
+  assert.match(html, /\-\$80\.00/); assert.match(html, /15,000 Aeroplan × 1\.80¢/);
+  assert.match(html, /points \/ fictional-promo/); assert.match(html, /&lt;script&gt;unsafe&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>unsafe/);
+});
+
+test('per-card fee coverage excludes rewards and unused limits while showing all configured benefits', () => {
+  const d = ledger(); d.cards[0].annualFee = 80;
+  d.perks = [{ id: 'fictional-hotel', name: 'Unused fictional hotel credit', cardId: 'fictional-card', cycle: 'annual', allowance: 150 }];
+  d.points = [point('promo', 'earn', { amount: 15000, incomeBucket: 'perk', cardId: 'fictional-card' })];
+  d.costs = [{ id: 'fee', name: 'Annual fee', kind: 'annual-fee', cardId: 'fictional-card', date: '2026-06-01', amount: 80 }];
+  const app = mount(d); app.route('perks');
+  assert.match(app.element('#main').innerHTML, /Unused fictional hotel credit/);
+  assert.match(app.element('#main').innerHTML, /权益尚未覆盖年费/);
+  assert.match(app.element('#main').innerHTML, /消费返利、SUB、转点奖励和未用额度均不计/);
+});
+
+test('currency cards expose balances, raw taxes and measured CPP; sliders refresh assets without changing realized CPP', () => {
+  const d = ledger(); d.points = [
+    point('snapshot', 'balance', { amount: 9000 }),
+    point('redeem', 'redeem', { date: '2026-06-02', amount: 2000, cashReference: 50, taxes: 10, taxesOriginal: 14, taxesCurrency: 'CAD', notes: 'Fictional fare reference' })
+  ];
+  const app = mount(d); app.route('points');
+  assert.match(app.element('#main').innerHTML, /7,000 点/); assert.match(app.element('#main').innerHTML, /2\.000¢/);
+  assert.match(app.element('#main').innerHTML, /CAD 14/); assert.match(app.element('#main').innerHTML, /暂不追踪余额/);
+  app.element('#main').listeners.input({ target: { dataset: { cpp: 'Aeroplan' }, value: '2' } });
+  assert.match(app.element('[data-program-cards]').innerHTML, /\$140\.00/);
+  assert.match(app.element('[data-program-cards]').innerHTML, /2\.000¢/);
+  assert.equal(app.requests.length, 0);
 });
