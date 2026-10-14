@@ -74,6 +74,18 @@ test('JSON exports contain the ledger, without GitHub config or session token', 
   assert.doesNotMatch(text, /fictional-test-token|fictional-ledger|fictional-owner/);
 });
 
+test('editing a legacy snapshot-linked source keeps its balance checkbox disabled by default', () => {
+  const d = ledger(); d.points = [
+    point('fictional-snapshot', 'balance', { amount: 12000 }),
+    point('fictional-source', 'earn', { date: '', periodYear: 2026, amount: 700, includedInSnapshot: 'fictional-snapshot' })
+  ];
+  const app = mount(d); app.route('points');
+  app.click('edit', { type: 'points', id: 'fictional-source' });
+  const checkbox = app.element('#editor-fields').innerHTML.match(/<input[^>]+name="affectsBalance"[^>]*>/)[0];
+  assert.doesNotMatch(checkbox, /checked/);
+  assert.equal(JSON.parse(app.localStorage.getItem(ledgerKey)).points[1].includedInSnapshot, 'fictional-snapshot');
+});
+
 test('full JSON import backs up, replaces locally, and blocks saving over an unread cloud ledger', async () => {
   const original = ledger(), next = ledger(); next.cards[0].name = 'Fictional imported card';
   const app = mount(original, [response(200, { default_branch: 'main' }), response(200, { sha: 'cloud-sha', type: 'file' })]);

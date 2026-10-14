@@ -88,6 +88,20 @@ test('year-only sources with uncertain snapshot ordering hide balance until clar
   assert.equal(C.balances(d, today).Aeroplan, 60000);
 });
 
+test('legacy snapshot-linked sources retain income without changing the verified balance', () => {
+  const d = ledger();
+  d.points = [
+    point('fictional-snapshot', 'balance', { amount: 12000 }),
+    point('fictional-source', 'earn', { date: '', periodYear: 2026, amount: 700, incomeBucket: 'flight', includedInSnapshot: 'fictional-snapshot' }),
+    point('fictional-new-source', 'earn', { date: '2026-07-01', amount: 100, incomeBucket: 'flight' })
+  ];
+  assert.equal(C.balances(d, today).Aeroplan, 12100);
+  close(R.report(d, 'all', today).totals.nonCard, 14.4);
+  assert.equal(d.points[1].includedInSnapshot, 'fictional-snapshot');
+  d.points[1].includedInSnapshot = 'missing-snapshot';
+  assert.equal(C.balances(d, today).Aeroplan, undefined);
+});
+
 test('redemption CPP requires known cash reference and USD taxes, including an explicit zero', () => {
   const d = ledger(); const p = point('redeem', 'redeem', { amount: 25000, cashReference: 450, taxesOriginal: 70, taxesCurrency: 'CAD' });
   assert.equal(C.cpp(p), null);

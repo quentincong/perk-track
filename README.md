@@ -6,7 +6,7 @@
 
 - 应用仓库：[quentincong/perk-track](https://github.com/quentincong/perk-track)，目前公开。用户计划以后取得 GitHub Pro 再改为 private；维护者不得自行修改权限或发布方式。
 - 应用地址：[GitHub Pages](https://quentincong.github.io/perk-track/)。2026-10-14 只读核实配置为 `Deploy from a branch`，`main` / `/ (root)`，有 `.nojekyll`。
-- 用户指定账本为独立私有仓库 `quentincong/perk-track-data` 的 `data.json`。本轮未访问真实账本。
+- 用户指定账本为独立私有仓库 `quentincong/perk-track-data` 的 `data.json`。初次交接未访问真实账本；后续仅在用户授权审阅或记账时处理指定内容，实际数据不进入应用仓库或测试。
 - 个人账本、token、账户信息、真实数据的 HTML / JSON / CSV / 备份不得提交到应用仓库。`.gitignore` 只是防误操作，不能代替审查提交内容。
 
 本次接手时本地目录为空，代码从应用仓库克隆。原 README 提到的 `Perk-Track.html`、`tests/` 和 npm 配置并未入库；没有迁移这些不存在的文件或旧旅行脚本。本轮补入了测试和开发脚本。当前入口是 `index.html` 加本地资源文件。
@@ -96,6 +96,8 @@ if ($repoExit -ne 0) { throw "gh failed (exit $repoExit); inspect the captured e
 - **未知与归因**：支持卡片 `openMonth` / `openUnknown`、若干收入与费用 `periodYear`、使用 `periodStart` / `periodEnd`（后者是下周期首日）、`cycleConfirmed:false`。不补假日期、金额或周期。周年无锚点不猜周期；CSP 等实际结单边界仍需指定真实周期或标待核对。每笔费用只归一张卡或一个银行活动，兑换税费、银行流水费用不重复记入成本账本。
 
 ## 文件与数据模型
+
+旧账本中的 `includedInSnapshot` 可以是同积分计划余额快照的 ID，也兼容布尔 true；没有明确 `affectsBalance` 时，这类赚点只补来源和收入分类，不再次增加余额。编辑时“此赚点改变余额”默认沿用这项含义，原关联字段保留。
 
 | 文件 | 责任 |
 | --- | --- |

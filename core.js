@@ -73,9 +73,14 @@
     const uncertain=data.cards.filter(c=>c.kind==='personal'&&!c.openDate&&(!c.openMonth||[6,12,24].some(n=>{const [lo,hi]=bounds(c);const cutoff=addMonths(today,-n);return lo<=cutoff&&hi>cutoff||lo<=today&&hi>today;}))).length;
     return {six:counts(6),twelve:counts(12),twentyFour:eligible.length,uncertain,nextDrop:eligible.length?eligible.map(c=>c.openDate?addMonths(c.openDate,24):addMonths(`${c.openMonth}-01`,24).slice(0,7)+'（具体日待核对）').sort()[0]:null};
   }
+  function earnAffectsBalance(data,r) {
+    if(typeof r.affectsBalance==='boolean')return r.affectsBalance;
+    if(r.includedInSnapshot===true)return false;
+    return !data.points.some(s=>s.id===r.includedInSnapshot&&s.type==='balance'&&s.program===r.program);
+  }
   function balances(data,today=localDate()) {
     const result=Object.create(null);const add=(p,n)=>{result[p]=(result[p]||0)+n;};
-    const events=data.points.filter(r=>(r.date?r.date<=today:r.periodYear<=Number(today.slice(0,4)))&&!(r.type==='earn'&&r.affectsBalance===false));
+    const events=data.points.filter(r=>(r.date?r.date<=today:r.periodYear<=Number(today.slice(0,4)))&&(r.type!=='earn'||earnAffectsBalance(data,r)));
     for(const r of events.slice().sort((a,b)=>String(a.date||a.periodYear).localeCompare(String(b.date||b.periodYear)))){
       if(r.type==='balance')result[r.program]=r.amount;
       if(['earn','buy','refund','adjust-in'].includes(r.type))add(r.program,r.amount||0);
@@ -127,6 +132,6 @@
     data.points=[{id:'demo-earn',date:shift(-60),type:'earn',program:'UR',amount:80000,cardId:'demo-card-a',notes:'包含历史期初余额的赚点示例'},{id:'demo-transfer',date:shift(-25),type:'transfer',program:'UR',amount:50000,targetProgram:'Aeroplan',received:60000,notes:'20% 转点奖励已入账'},{id:'demo-redeem',date:shift(-10),type:'redeem',program:'Aeroplan',amount:25000,cashReference:450,taxes:50,notes:'现金参考价 $450，税费 $50'}];
     data.costs=[{id:'demo-fee',date:addMonths(today,-3),name:'年费 · 示例',amount:95,cardId:'demo-card-a',bankId:'',notes:'只记录已发生费用'}];return data;
   }
-  const api={collections,money,localDate,date,iso,days,addMonths,blank,validate,period,perkProgress,cardState,velocity,balances,occupied,summary,bankProgress,cpp,demo,opened,isClosed};
+  const api={collections,money,localDate,date,iso,days,addMonths,blank,validate,period,perkProgress,cardState,velocity,balances,earnAffectsBalance,occupied,summary,bankProgress,cpp,demo,opened,isClosed};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PerkCore=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
