@@ -4,7 +4,7 @@
   function decode(base64){return new TextDecoder().decode(Uint8Array.from(atob(base64.replace(/\s/g,'')),c=>c.charCodeAt(0)));}
   function config(c){if(!/^[A-Za-z0-9-]+$/.test(c.owner)||! /^[A-Za-z0-9._-]+$/.test(c.repo)||!c.token)throw new Error('填写有效的 GitHub 用户名、仓库名和 token。');if(!c.path||c.path.startsWith('/')||c.path.split('/').some(p=>!p||p==='.'||p==='..'))throw new Error('数据路径应为相对文件路径，例如 data.json。');return c;}
   class GithubStore{
-    constructor(c,request=fetch){this.c=config(c);this.request=request;this.sha=null;this.loaded=false;}
+    constructor(c,request=root.fetch.bind(root)){this.c=config(c);this.request=request;this.sha=null;this.loaded=false;}
     url(){return `https://api.github.com/repos/${encodeURIComponent(this.c.owner)}/${encodeURIComponent(this.c.repo)}/contents/${this.c.path.split('/').map(encodeURIComponent).join('/')}`;}
     async call(url,options={}){const response=await this.request(url,{...options,signal:AbortSignal.timeout(20000),headers:{Accept:'application/vnd.github+json',Authorization:`Bearer ${this.c.token}`,'X-GitHub-Api-Version':'2022-11-28',...options.headers}});if(!response.ok){const error=new Error(response.status===401?'GitHub 授权失败，请检查 token。':response.status===403?'GitHub 拒绝访问，请检查仓库权限或请求限额。':response.status===409?'云端文件有变化，已停止覆盖。请先备份本地数据，再读取云端。':`GitHub 请求失败（${response.status}）。请检查仓库、分支、文件路径及权限。`);error.status=response.status;throw error;}return response.json();}
     async read(){const q=this.c.branch?`?ref=${encodeURIComponent(this.c.branch)}`:'';const result=await this.call(this.url()+q);if(result.type!=='file'||result.encoding!=='base64')throw new Error('路径不是可读取的 JSON 文件，或文件过大。');this.sha=result.sha;this.loaded=true;return JSON.parse(decode(result.content));}

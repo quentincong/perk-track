@@ -41,6 +41,6 @@
     const c=data.cards.find(c=>c.id===cardId),program=c?.subProgram||'Aeroplan',bonusValue=value(data,program,bonusPoints).amount,normalValue=value(data,program,paymentAmount*normalRate).amount,fee=paymentAmount*feePercent/100;
     return {bonusValue,normalValue,fee,induced,foregone,subNet:bonusValue-fee-induced-foregone,net:bonusValue+normalValue-fee-induced-foregone};
   }
-  function migrate(data){data=structuredClone(data);data.rewardRules??=[];data.settings.valuations={UR:1.9,Aeroplan:1.9,...data.settings.valuations};return data;}
+  function migrate(data){data=structuredClone(data);data.rewardRules??=[];data.settings.valuations={UR:1.8,Aeroplan:1.8,...data.settings.valuations};return data;}
   const api={categories,within,value,report,bestCards,subScenario,migrate};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PerkReports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

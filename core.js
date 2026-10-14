@@ -9,7 +9,7 @@
   function days(a,b) { return Math.round((date(b)-date(a))/dayMs); }
   function anniversary(year, month, day) { return iso(new Date(Date.UTC(year,month,Math.min(day,new Date(Date.UTC(year,month+1,0)).getUTCDate())))); }
   function addMonths(s,n) { const d=date(s); const first=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)); return anniversary(first.getUTCFullYear(),first.getUTCMonth(),d.getUTCDate()); }
-  function blank() { return {schemaVersion:1,settings:{baseCurrency:'USD',opportunityRate:4,valuations:{UR:1.9,Aeroplan:1.9},demo:false},...Object.fromEntries(collections.map(k=>[k,[]]))}; }
+  function blank() { return {schemaVersion:1,settings:{baseCurrency:'USD',opportunityRate:4,valuations:{UR:1.8,Aeroplan:1.8},demo:false},...Object.fromEntries(collections.map(k=>[k,[]]))}; }
   function validate(data) {
     if (!data || typeof data!=='object' || Array.isArray(data) || data.schemaVersion!==1) throw new Error('文件不是支持的 Perk Track v1 备份。');
     if (!data.settings || typeof data.settings!=='object' || Array.isArray(data.settings)) throw new Error('缺少有效设置。');
