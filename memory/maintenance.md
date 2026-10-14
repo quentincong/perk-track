@@ -9,3 +9,4 @@
 - `app.js` 管理本地保存与用户手动云端操作；`core.js` 校验、周期、余额、资金占用；`reports.js` 分类收益；`github.js` 编解码与 Contents API。保持默认 fetch 的 globalThis 绑定。
 - GithubStore 必须读最新数据取得 SHA，不能仅 prepare 已有文件后写；404 创建还需确认分支；失败撤销可写状态，409 不盲重试。PowerShell 立即捕获 gh 退出码及 stderr，区分不存在与网络/授权失败。
 - 完整 JSON 导入是替换+重置 store，不能当增量云端更新。后续提案在 docs/JSON_UPDATES.md：稳定 ID、before/after、差异预览、SHA、幂等、无后端；本轮未实现合并器。
+- 2026-10-14 用户在交接整理提交 `6fcad71` 后明确要求 push，使改动可在实际 GitHub Pages 使用；这次发布已授权，不应再停在本地提交或再次征求确认。授权不包含私有账本、仓库权限或部署方式变更。发布结果核对 GitHub Pages build 的 commit/status 和线上应用资源。
